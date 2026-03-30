@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
@@ -15,8 +15,9 @@ class SessionResponse(BaseModel):
     architecture: ArchitectureType
     task: TaskType
     status: StatusType
-    api_key: Optional[str] = None
-    created_at: datetime
+    api_key: Optional[str] = Field(None, serialization_alias="apiKey")
+    created_at: datetime = Field(serialization_alias="createdAt")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
