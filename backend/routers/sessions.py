@@ -110,10 +110,36 @@ def update_session_status(
     return session
 
 
+# @router.post("/{session_id}/upload")
+# async def upload_dataset(
+#     session_id: str,
+#     files: list[UploadFile] = File(...),
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     session = db.query(SessionModel).filter(
+#         SessionModel.id == session_id,
+#         SessionModel.user_id == current_user.id
+#     ).first()
+#     if not session:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="Session not found"
+#         )
+#     upload_dir = f"uploads/{session_id}"
+#     os.makedirs(upload_dir, exist_ok=True)
+#     saved_files = []
+#     for file in files:
+#         file_path = f"{upload_dir}/{file.filename}"
+#         with open(file_path, "wb") as buffer:
+#             shutil.copyfileobj(file.file, buffer)
+#         saved_files.append(file.filename)
+#     return {"uploaded": saved_files, "count": len(saved_files)}
+
 @router.post("/{session_id}/upload")
-async def upload_dataset(
+def upload_dataset_info(
     session_id: str,
-    files: list[UploadFile] = File(...),
+    image_count: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -126,15 +152,7 @@ async def upload_dataset(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found"
         )
-    upload_dir = f"uploads/{session_id}"
-    os.makedirs(upload_dir, exist_ok=True)
-    saved_files = []
-    for file in files:
-        file_path = f"{upload_dir}/{file.filename}"
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        saved_files.append(file.filename)
-    return {"uploaded": saved_files, "count": len(saved_files)}
+    return {"message": f"Dataset registered with {image_count} images", "image_count": image_count}
 
 
 @router.get("/{session_id}/model/download")
