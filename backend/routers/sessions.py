@@ -122,20 +122,19 @@ classes: {classes_str}, number of classes: {len(request.classes)}"""
         learning_rate = "1e-4"
         acceptance_criteria = "80%"
 
-        data = json.loads(response_text[7:-3])
-        print(data)
+        if response_text.strip()[0] != "{":
+            data = json.loads(response_text[7:-3])
+            print(data)
 
-        epochs = str(data["Epochs"])
-        learning_rate = float_to_learning_rate_option(data["Learning Rate"])
-        
-        # lines = response_text.split("\n")
-        # for line in lines:
-        #     line = line.strip()
-        #     if '"Epochs":' in line or '"epochs":' in line:
-        #         epochs = line.split(":", 1)[1].strip()
-        #     elif '"Learning Rate":' in line or '"learning rate":' in line or '"learning_rate":' in line:
-        #         learning_rate = line.split(":", 1)[1].strip()
-        
+            epochs = str(data["Epochs"])
+            learning_rate = float_to_learning_rate_option(data["Learning Rate"])
+        else:
+            data = json.loads(response_text)
+            print(data)
+
+            epochs = str(data["Epochs"])
+            learning_rate = float_to_learning_rate_option(data["Learning Rate"])
+
         return HyperparameterResponse(
             acceptance_criteria=acceptance_criteria,
             epochs=epochs,
