@@ -11,6 +11,9 @@ import secrets
 from models.session import StatusType
 import shutil
 import os
+import boto3
+import json
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -153,6 +156,106 @@ def upload_dataset_info(
             detail="Session not found"
         )
     return {"message": f"Dataset registered with {image_count} images", "image_count": image_count}
+
+
+class HyperparameterRequest(BaseModel):
+    image_count: int
+    image_size: int
+    classes: List[str]
+
+
+class HyperparameterResponse(BaseModel):
+    acceptance_criteria: str
+    epochs: str
+    learning_rate: str
+    from_claude: bool
+
+
+@router.post("/suggest-hyperparameters", response_model=HyperparameterResponse)
+def suggest_hyperparameters(
+    request: HyperparameterRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Use Claude to suggest training hyperparameters based on dataset characteristics.
+    """
+    try:
+        # Initialize Bedrock client
+        bedrock = boto3.client("bedrock-runtime")
+        
+        # Create prompt for Claude
+        classes_str = ", ".join(request.classes)
+        prompt = f"""Based on the following semantic segmentation training configuration, suggest appropriate hyperparameters:
+
+Dataset Characteristics:
+- Number of images: {request.image_count}
+- Image size: {request.image_size}x{request.image_size} pixels
+- Number of classes: {len(request.classes)}
+- Classes: {classes_str}
+
+Please provide ONLY the following values in the exact format below, one per line:
+acceptance_criteria: [value]%
+epochs: [value]
+learning_rate: [value]
+
+For example:
+acceptance_criteria: 80%
+epochs: 20
+learning_rate: 1e-4
+
+Respond with only these three lines, no other text."""
+
+        # Call Claude via Bedrock
+        response = bedrock.invoke_model(
+            modelId="anthropic.claude-3-5-sonnet-20241022",
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-06-01",
+                "max_tokens": 200,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            })
+        )
+        
+        # Parse response
+        response_body = json.loads(response["body"].read())
+        text_response = response_body["content"][0]["text"].strip()
+        
+        # Parse the returned values
+        lines = text_response.strip().split("\n")
+        acceptance_criteria = "80%"
+        epochs = "10"
+        learning_rate = "1e-4"
+        
+        for line in lines:
+            line = line.strip()
+            if "acceptance_criteria:" in line:
+                acceptance_criteria = line.split(":", 1)[1].strip()
+            elif "epochs:" in line:
+                epochs = line.split(":", 1)[1].strip()
+            elif "learning_rate:" in line:
+                learning_rate = line.split(":", 1)[1].strip()
+        
+        return HyperparameterResponse(
+            acceptance_criteria=acceptance_criteria,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            from_claude=True
+        )
+        
+    except Exception as e:
+        # Fall back to defaults if Claude call fails
+        print(f"Error calling Claude: {e}")
+        return HyperparameterResponse(
+            acceptance_criteria="80%",
+            epochs="10",
+            learning_rate="1e-4",
+            from_claude=False
+        )
 
 
 @router.get("/{session_id}/model/download")
