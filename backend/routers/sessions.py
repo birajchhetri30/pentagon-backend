@@ -82,6 +82,11 @@ class HyperparameterResponse(BaseModel):
     acceptance_criteria: str
     epochs: str
     learning_rate: str
+    batch_size: str
+    val_split: str
+    momentum: str
+    weight_decay: str
+    aux_loss_weight: str
     from_claude: bool
 
 def float_to_learning_rate_option(value: float) -> str:
@@ -113,13 +118,21 @@ def suggest_hyperparameters(
                 acceptance_criteria="80%",
                 epochs="10",
                 learning_rate="1e-4",
+                batch_size="8",
+                val_split="0.2",
+                momentum="0.9",
+                weight_decay="1e-4",
+                aux_loss_weight="1.0",
                 from_claude=False
             )
         
         # Create question string for Claude
         classes_str = ", ".join(request.classes)
-        question = f"""dataset size is {request.image_count} images, image size {request.image_size}x{request.image_size} pixels, 
-classes: {classes_str}, number of classes: {len(request.classes)}"""
+        question = f"""I am training a DeepLabV3+ semantic segmentation model. Suggest optimal hyperparameters as JSON only, no explanation.
+Dataset: {request.image_count} images, {request.image_size}x{request.image_size} pixels.
+Classes: {classes_str} ({len(request.classes)} classes).
+Return exactly this JSON format:
+{{"Epochs": <int>, "Learning Rate": <float>, "Batch Size": <int>, "Val Split": <float>, "Momentum": <float>, "Weight Decay": <float>, "Aux Loss Weight": <float>}}"""
 
         # Call Lambda function with GET request (URL-encoded parameters)
         lambda_response = requests.get(
@@ -143,24 +156,36 @@ classes: {classes_str}, number of classes: {len(request.classes)}"""
         epochs = "10"
         learning_rate = "1e-4"
         acceptance_criteria = "80%"
+        batch_size = "8"
+        val_split = "0.2"
+        momentum = "0.9"
+        weight_decay = "1e-4"
+        aux_loss_weight = "1.0"
 
         if response_text.strip()[0] != "{":
             data = json.loads(response_text[7:-3])
             print(data)
-
-            epochs = str(data["Epochs"])
-            learning_rate = float_to_learning_rate_option(data["Learning Rate"])
         else:
             data = json.loads(response_text)
             print(data)
 
-            epochs = str(data["Epochs"])
-            learning_rate = float_to_learning_rate_option(data["Learning Rate"])
+        epochs = str(data.get("Epochs", 10))
+        learning_rate = float_to_learning_rate_option(data.get("Learning Rate", 0.0001))
+        batch_size = str(data.get("Batch Size", 8))
+        val_split = str(data.get("Val Split", 0.2))
+        momentum = str(data.get("Momentum", 0.9))
+        weight_decay = str(data.get("Weight Decay", 0.0001))
+        aux_loss_weight = str(data.get("Aux Loss Weight", 1.0))
 
         return HyperparameterResponse(
             acceptance_criteria=acceptance_criteria,
             epochs=epochs,
             learning_rate=learning_rate,
+            batch_size=batch_size,
+            val_split=val_split,
+            momentum=momentum,
+            weight_decay=weight_decay,
+            aux_loss_weight=aux_loss_weight,
             from_claude=True
         )
         
@@ -171,6 +196,11 @@ classes: {classes_str}, number of classes: {len(request.classes)}"""
             acceptance_criteria="80%",
             epochs="10",
             learning_rate="1e-4",
+            batch_size="8",
+            val_split="0.2",
+            momentum="0.9",
+            weight_decay="1e-4",
+            aux_loss_weight="1.0",
             from_claude=False
         )
 
