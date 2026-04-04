@@ -28,5 +28,6 @@ class Session(Base):
     task = Column(Enum(TaskType), nullable=False)
     status = Column(Enum(StatusType), default=StatusType.pending)
     api_key = Column(String, unique=True, nullable=True)
+    classes = Column(String, nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

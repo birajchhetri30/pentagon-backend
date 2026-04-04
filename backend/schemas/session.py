@@ -8,6 +8,7 @@ class CreateSessionRequest(BaseModel):
     name: str
     architecture: ArchitectureType
     task: TaskType
+    classes: Optional[str] = None
 
 class SessionResponse(BaseModel):
     id: UUID
@@ -15,6 +16,7 @@ class SessionResponse(BaseModel):
     architecture: ArchitectureType
     task: TaskType
     status: StatusType
+    classes: Optional[str] = None
     api_key: Optional[str] = Field(None, serialization_alias="apiKey")
     created_at: datetime = Field(serialization_alias="createdAt")
 

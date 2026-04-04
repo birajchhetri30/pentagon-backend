@@ -38,10 +38,22 @@ def create_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    existing = db.query(SessionModel).filter(
+        SessionModel.user_id == current_user.id,
+        SessionModel.name == request.name,
+        SessionModel.task == request.task
+    ).first()
+    if existing:
+        if request.classes and not existing.classes:
+            existing.classes = request.classes
+            db.commit()
+            db.refresh(existing)
+        return existing
     new_session = SessionModel(
         name=request.name,
         architecture=request.architecture,
         task=request.task,
+        classes=request.classes,
         user_id=current_user.id
     )
     db.add(new_session)
@@ -151,6 +163,25 @@ classes: {classes_str}, number of classes: {len(request.classes)}"""
             learning_rate="1e-4",
             from_claude=False
         )
+
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = db.query(SessionModel).filter(
+        SessionModel.id == session_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    db.delete(session)
+    db.commit()
+
 
 @router.get("/{session_id}", response_model=SessionResponse)
 def get_session(
