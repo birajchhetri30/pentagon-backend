@@ -16,6 +16,8 @@ class ArchitectureType(str, enum.Enum):
 class StatusType(str, enum.Enum):
     pending = "pending"
     running = "running"
+    hitl_paused = "hitl_paused"
+    stopped = "stopped"
     completed = "completed"
     failed = "failed"
 
@@ -27,7 +29,9 @@ class Session(Base):
     architecture = Column(Enum(ArchitectureType), nullable=False)
     task = Column(Enum(TaskType), nullable=False)
     status = Column(Enum(StatusType), default=StatusType.pending)
+    stop_reason = Column(String, nullable=True)
     api_key = Column(String, unique=True, nullable=True)
     classes = Column(String, nullable=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

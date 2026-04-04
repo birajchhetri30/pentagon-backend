@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
 from schemas.auth import RegisterRequest, LoginRequest, ConfirmRequest, ResendCodeRequest, TokenResponse
+from auth_utils import get_current_user
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
@@ -199,3 +200,14 @@ def _local_login(request: LoginRequest, db: Session):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     token = create_access_token({"sub": str(user.id)})
     return TokenResponse(access_token=token)
+
+
+# ── Me ──
+
+@router.get("/me")
+def me(user: User = Depends(get_current_user)):
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "permissions": [p.value if hasattr(p, 'value') else p for p in (user.permissions or [])],
+    }

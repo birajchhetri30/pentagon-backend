@@ -14,11 +14,33 @@ import os
 import json
 from pydantic import BaseModel
 import requests
+import boto3
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
 load_dotenv()
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+AWS_REGION = os.getenv("AWS_REGION")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
+
+USE_S3 = S3_BUCKET_NAME and S3_BUCKET_NAME != "your_s3_bucket_name_here"
+
+if USE_S3:
+    s3_kwargs = {
+        "region_name": AWS_REGION,
+        "endpoint_url": f"https://s3.{AWS_REGION}.amazonaws.com",
+    }
+    if AWS_ACCESS_KEY_ID and AWS_ACCESS_KEY_ID != "your_aws_access_key_here":
+        s3_kwargs["aws_access_key_id"] = AWS_ACCESS_KEY_ID
+        s3_kwargs["aws_secret_access_key"] = AWS_SECRET_ACCESS_KEY
+    if AWS_SESSION_TOKEN:
+        s3_kwargs["aws_session_token"] = AWS_SESSION_TOKEN
+    s3_client = boto3.client("s3", **s3_kwargs)
 
 
 @router.get("", response_model=List[SessionResponse])
@@ -163,6 +185,34 @@ classes: {classes_str}, number of classes: {len(request.classes)}"""
             learning_rate="1e-4",
             from_claude=False
         )
+
+class PresignedUrlRequest(BaseModel):
+    filenames: List[str]
+    content_types: List[str]
+    session_id: str
+
+
+@router.post("/presigned-urls")
+def get_presigned_urls(
+    request: PresignedUrlRequest,
+    current_user: User = Depends(get_current_user)
+):
+    if not USE_S3:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="S3 not configured")
+    try:
+        urls = []
+        for filename, content_type in zip(request.filenames, request.content_types):
+            key = f"datasets/{current_user.id}/{request.session_id}/{filename}"
+            url = s3_client.generate_presigned_url(
+                "put_object",
+                Params={"Bucket": S3_BUCKET_NAME, "Key": key, "ContentType": content_type},
+                ExpiresIn=3600,
+            )
+            urls.append({"filename": filename, "url": url, "key": key, "content_type": content_type})
+        return {"urls": urls}
+    except ClientError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(
