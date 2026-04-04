@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routers import auth, sessions, intervention, websocket, jobs
+from routers import auth, sessions, intervention, websocket, jobs, training, proposals
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,6 +22,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(jobs.router)
+app.include_router(training.router)
+app.include_router(proposals.router)
 app.include_router(intervention.router)
 app.include_router(websocket.router)
 
