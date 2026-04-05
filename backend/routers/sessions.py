@@ -232,6 +232,38 @@ def get_presigned_urls(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+class DownloadMasksRequest(BaseModel):
+    session_id: str
+
+
+@router.post("/download-masks")
+def get_mask_download_urls(
+    request: DownloadMasksRequest,
+    current_user: User = Depends(get_current_user)
+):
+    if not USE_S3:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="S3 not configured")
+    try:
+        user_key = current_user.cognito_sub or str(current_user.id)
+        prefix = f"masks/{user_key}/{request.session_id}/"
+        response = s3_client.list_objects_v2(Bucket=S3_BUCKET_NAME, Prefix=prefix)
+        if "Contents" not in response:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No masks found")
+        urls = []
+        for obj in response["Contents"]:
+            key = obj["Key"]
+            filename = key.split("/")[-1]
+            url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": S3_BUCKET_NAME, "Key": key},
+                ExpiresIn=3600,
+            )
+            urls.append({"filename": filename, "url": url, "key": key})
+        return {"urls": urls, "count": len(urls)}
+    except ClientError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(
     session_id: str,
