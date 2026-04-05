@@ -17,7 +17,7 @@ class TrainingMetricCallback(BaseModel):
     val_miou: float
     best_miou: float
     current_lr: float
-    checkpoint_saved: Optional[str] = None
+    checkpoint_saved: Optional[bool] = None
 
 
 @router.post("/metrics-callback")

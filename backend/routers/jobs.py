@@ -6,6 +6,7 @@ from models.job import Job, JobType
 from models.metric import Metric
 from schemas.job import CreateJobRequest, JobResponse
 from auth_utils import get_current_user
+from ssm_utils import get_job_status_ssm
 from pydantic import BaseModel
 from typing import Any
 
@@ -41,6 +42,15 @@ def get_job(
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == current_user.id).first()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    # Check SSM if not already completed
+    if not job.is_completed:
+        ssm_status = get_job_status_ssm(job_id)
+        if ssm_status == "d":
+            job.is_completed = True
+            db.commit()
+            db.refresh(job)
+
     return JobResponse.from_orm_manual(job)
 
 
@@ -83,10 +93,9 @@ def get_latest_metric(
 @router.patch("/{job_id}/complete")
 def complete_job(
     job_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db
 ):
-    job = db.query(Job).filter(Job.id == job_id, Job.user_id == current_user.id).first()
+    job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     job.is_completed = True
